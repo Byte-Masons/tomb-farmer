@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 /**
  * @dev Deposit TombSwap LPs (with WFTM underlying) in TShareRewardsPool. Harvest TSHARE rewards and recompound.
  */
-contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
+contract ReaperStrategyTombTshareMai is ReaperBaseStrategyv2 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     // 3rd-party contract addresses
@@ -23,23 +23,25 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      * @dev Tokens Used:
      * {WFTM} - Required for liquidity routing when doing swaps.
      * {TSHARE} - Reward token for depositing LP into TShareRewardsPool.
+     * {MAI} - One of the tokens within the LP.
      * {want} - LP token address.
      * {lpToken0} - First token within the LP.
      * {lpToken1} - Second token within the LP.
      */
     address public constant WFTM = address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
     address public constant TSHARE = address(0x4cdF39285D7Ca8eB3f090fDA0C069ba5F4145B37);
+    address public constant MAI = address(0xfB98B335551a418cD0737375a2ea0ded62Ea213b);
     address public want;
     address public lpToken0;
     address public lpToken1;
 
     /**
      * @dev Paths used to swap tokens:
-     * {tshareToWftmPath} - to swap {TSHARE} to {WFTM}
-     * {wftmToLPTokenPath} - to swap half of {WFTM} to the other underlying token within the LP.
+     * {tshareToWftmPath} - to swap {TSHARE} to {WFTM} for fees.
+     * {tshareToMaiPath} - to swap half of {TSHARE} to Mai.
      */
     address[] public tshareToWftmPath;
-    address[] public wftmToLPTokenPath;
+    address[] public tshareToMaiPath;
 
     /**
      * @dev Tomb variables
@@ -66,11 +68,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
         lpToken1 = IUniswapV2Pair(_want).token1();
 
         tshareToWftmPath = [TSHARE, WFTM];
-        if (lpToken0 == WFTM) {
-            wftmToLPTokenPath = [WFTM, lpToken1];
-        } else {
-            wftmToLPTokenPath = [WFTM, lpToken0];
-        }
+        tshareToMaiPath = [TSHARE, MAI];
     }
 
     /**
@@ -107,9 +105,11 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      */
     function _harvestCore() internal override {
         IMasterChef(TSHARE_REWARDS_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
-        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)), tshareToWftmPath);
+
+        uint256 tshareFee = (IERC20Upgradeable(TSHARE).balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR;
+        _swap(tshareFee, tshareToWftmPath);
         _chargeFees();
-        _swap(IERC20Upgradeable(WFTM).balanceOf(address(this)) / 2, wftmToLPTokenPath);
+        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)) / 2, tshareToMaiPath);
         _addLiquidity();
         deposit();
     }
@@ -151,7 +151,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      */
     function _chargeFees() internal {
         IERC20Upgradeable wftm = IERC20Upgradeable(WFTM);
-        uint256 wftmFee = (wftm.balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR;
+        uint256 wftmFee = wftm.balanceOf(address(this));
         if (wftmFee != 0) {
             uint256 callFeeToUser = (wftmFee * callFee) / PERCENT_DIVISOR;
             uint256 treasuryFeeToVault = (wftmFee * treasuryFee) / PERCENT_DIVISOR;
@@ -228,8 +228,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      */
     function _retireStrat() internal override {
         IMasterChef(TSHARE_REWARDS_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
-        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)), tshareToWftmPath);
-        _swap(IERC20Upgradeable(WFTM).balanceOf(address(this)) / 2, wftmToLPTokenPath);
+        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)) / 2, tshareToMaiPath);
         _addLiquidity();
 
         (uint256 poolBal, ) = IMasterChef(TSHARE_REWARDS_POOL).userInfo(poolId, address(this));
