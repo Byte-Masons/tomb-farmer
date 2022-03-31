@@ -36,7 +36,7 @@ describe('Vaults', function () {
   
   const treasuryAddr = '0x0e7c5313E9BB80b654734d9b7aB1FB01468deE3b';
   const paymentSplitterAddress = '0x63cbd4134c2253041F370472c130e92daE4Ff174';
-  const wantAddress = '0x45f4682B560d4e3B8FF1F1b3A38FDBe775C7177b';
+  const wantAddress = '0xfca12A13ac324C09e9F43B5e5cfC9262f3Ab3223';
 
   const wantHolderAddr = '0xB339ac13d9dAe79Ab6caD15Ec8903131099ceEA5';
   const strategistAddr = '0x1A20D7A31e5B3Bc5f02c8A146EF6f394502a10c4';
@@ -53,7 +53,7 @@ describe('Vaults', function () {
         {
           forking: {
             jsonRpcUrl: 'https://rpc.ftm.tools/',
-            blockNumber: 33861175,
+            blockNumber: 34842841,
           },
         },
       ],
@@ -74,7 +74,7 @@ describe('Vaults', function () {
 
     //get artifacts
     Vault = await ethers.getContractFactory('ReaperVaultv1_4');
-    Strategy = await ethers.getContractFactory('ReaperStrategyTombMai');
+    Strategy = await ethers.getContractFactory('ReaperStrategyTombWftmUnderlying');
     Want = await ethers.getContractFactory('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20');
 
     //deploy contracts
@@ -87,7 +87,7 @@ describe('Vaults', function () {
     );
     strategy = await hre.upgrades.deployProxy(
       Strategy,
-      [vault.address, [treasuryAddr, paymentSplitterAddress], [strategistAddr]],
+      [vault.address, [treasuryAddr, paymentSplitterAddress], [strategistAddr], wantAddress, 3],
       { kind: 'uups' },
     );
     await strategy.deployed();
@@ -109,14 +109,14 @@ describe('Vaults', function () {
     });
 
     // Upgrade tests are ok to skip IFF no changes to BaseStrategy are made
-    it('should not allow implementation upgrades without initiating cooldown', async function () {
+    xit('should not allow implementation upgrades without initiating cooldown', async function () {
       const StrategyV2 = await ethers.getContractFactory('TestReaperStrategyTombMaiV2');
       await expect(hre.upgrades.upgradeProxy(strategy.address, StrategyV2)).to.be.revertedWith(
         'cooldown not initiated or still active',
       );
     });
 
-    it('should not allow implementation upgrades before timelock has passed', async function () {
+    xit('should not allow implementation upgrades before timelock has passed', async function () {
       await strategy.initiateUpgradeCooldown();
 
       const StrategyV2 = await ethers.getContractFactory('TestReaperStrategyTombMaiV3');
@@ -125,7 +125,7 @@ describe('Vaults', function () {
       );
     });
 
-    it('should allow implementation upgrades once timelock has passed', async function () {
+    xit('should allow implementation upgrades once timelock has passed', async function () {
       const StrategyV2 = await ethers.getContractFactory('TestReaperStrategyTombMaiV2');
       const timeToSkip = (await strategy.UPGRADE_TIMELOCK()).add(10);
       await strategy.initiateUpgradeCooldown();
@@ -133,7 +133,7 @@ describe('Vaults', function () {
       await hre.upgrades.upgradeProxy(strategy.address, StrategyV2);
     });
 
-    it('successive upgrades need to initiate timelock again', async function () {
+    xit('successive upgrades need to initiate timelock again', async function () {
       const StrategyV2 = await ethers.getContractFactory('TestReaperStrategyTombMaiV2');
       const timeToSkip = (await strategy.UPGRADE_TIMELOCK()).add(10);
       await strategy.initiateUpgradeCooldown();
