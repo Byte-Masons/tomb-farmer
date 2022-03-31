@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 /**
  * @dev Deposit TombSwap LPs (with WFTM underlying) in TShareRewardsPool. Harvest TSHARE rewards and recompound.
  */
-contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
+contract ReaperStrategyTombFtmTshare is ReaperBaseStrategyv2 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     // 3rd-party contract addresses
@@ -107,9 +107,11 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      */
     function _harvestCore() internal override {
         IMasterChef(TSHARE_REWARDS_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
-        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)), tshareToWftmPath);
+
+        uint256 tshareFee = (IERC20Upgradeable(TSHARE).balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR;
+        _swap(tshareFee, tshareToWftmPath);
         _chargeFees();
-        _swap(IERC20Upgradeable(WFTM).balanceOf(address(this)) / 2, wftmToLPTokenPath);
+        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)) / 2, tshareToWftmPath);
         _addLiquidity();
         deposit();
     }
@@ -151,7 +153,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      */
     function _chargeFees() internal {
         IERC20Upgradeable wftm = IERC20Upgradeable(WFTM);
-        uint256 wftmFee = (wftm.balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR;
+        uint256 wftmFee = wftm.balanceOf(address(this));
         if (wftmFee != 0) {
             uint256 callFeeToUser = (wftmFee * callFee) / PERCENT_DIVISOR;
             uint256 treasuryFeeToVault = (wftmFee * treasuryFee) / PERCENT_DIVISOR;
@@ -228,8 +230,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      */
     function _retireStrat() internal override {
         IMasterChef(TSHARE_REWARDS_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
-        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)), tshareToWftmPath);
-        _swap(IERC20Upgradeable(WFTM).balanceOf(address(this)) / 2, wftmToLPTokenPath);
+        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)) / 2, tshareToWftmPath);
         _addLiquidity();
 
         (uint256 poolBal, ) = IMasterChef(TSHARE_REWARDS_POOL).userInfo(poolId, address(this));
