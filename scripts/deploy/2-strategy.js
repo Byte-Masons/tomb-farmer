@@ -1,9 +1,11 @@
 const hre = require('hardhat');
 
 async function main() {
-  const vaultAddress = 'TODO';
+  const vaultAddress = '0x0Fade1D48df47f9A2ea7D1189409C784e47Cc0dA';
 
-  const Strategy = await ethers.getContractFactory('ReaperStrategyTombMai');
+  const Strategy = await ethers.getContractFactory('ReaperStrategyTombUsdcUnderlying');
+  const wantAddress = '0xEdf6595E2ae78a4e5C8725D7eD2A28AD974f1B8e';
+  const poolId = 8;
   const treasuryAddress = '0x0e7c5313E9BB80b654734d9b7aB1FB01468deE3b';
   const paymentSplitterAddress = '0x63cbd4134c2253041F370472c130e92daE4Ff174';
   const strategist1 = '0x1E71AEE6081f62053123140aacC7a06021D77348';
@@ -12,7 +14,13 @@ async function main() {
 
   const strategy = await hre.upgrades.deployProxy(
     Strategy,
-    [vaultAddress, [treasuryAddress, paymentSplitterAddress], [strategist1, strategist2, strategist3]],
+    [
+      vaultAddress,
+      [treasuryAddress, paymentSplitterAddress],
+      [strategist1, strategist2, strategist3],
+      wantAddress,
+      poolId,
+    ],
     {kind: 'uups', timeout: 0},
   );
 
