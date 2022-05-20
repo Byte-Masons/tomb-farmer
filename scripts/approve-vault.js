@@ -1,5 +1,5 @@
 async function main() {
-  const vaultAddress = '';
+  const vaultAddress = '0x08A49f456D385e4FA212D30C5973cDe6db7f98AD';
   const ERC20 = await ethers.getContractFactory('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20');
   const wantAddress = '0xAA9BE68D990d5e56870B2E0544f96ffb0B1dA8F7';
   const want = await ERC20.attach(wantAddress);
