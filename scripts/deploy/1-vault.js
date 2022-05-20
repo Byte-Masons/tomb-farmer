@@ -1,7 +1,7 @@
 async function main() {
   const Vault = await ethers.getContractFactory('ReaperVaultv1_4');
 
-  const wantAddress = '0x8C853ce1561A2c2cD2E857670e3cCd04BA4cB27b';
+  const wantAddress = '0xAA9BE68D990d5e56870B2E0544f96ffb0B1dA8F7';
   const tokenName = 'FTM-USDC Tomb Crypt';
   const tokenSymbol = 'rf-FTM-USDC';
   const depositFee = 0;
