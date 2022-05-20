@@ -36,10 +36,10 @@ describe('Vaults', function () {
 
   const treasuryAddr = '0x0e7c5313E9BB80b654734d9b7aB1FB01468deE3b';
   const paymentSplitterAddress = '0x63cbd4134c2253041F370472c130e92daE4Ff174';
-  const wantAddress = '0x8C853ce1561A2c2cD2E857670e3cCd04BA4cB27b';
-  const poolId = 13;
+  const wantAddress = '0xDEc1259188E6c5273AcD1e84d5B4b58897CA013e';
+  const poolId = 12;
 
-  const wantHolderAddr = '0xb339ac13d9dae79ab6cad15ec8903131099ceea5';
+  const wantHolderAddr = '0x3d1d8eb2a5ae60643d0e440a7158c4c9a25d9007';
   const strategistAddr = '0x1A20D7A31e5B3Bc5f02c8A146EF6f394502a10c4';
 
   let owner;
@@ -54,7 +54,7 @@ describe('Vaults', function () {
         {
           forking: {
             jsonRpcUrl: 'https://rpc.ftm.tools/',
-            blockNumber: 38643228,
+            blockNumber: 38676615,
           },
         },
       ],
@@ -151,7 +151,7 @@ describe('Vaults', function () {
   });
 
   describe('Vault Tests', function () {
-    xit('should allow deposits and account for them correctly', async function () {
+    it('should allow deposits and account for them correctly', async function () {
       const userBalance = await want.balanceOf(wantHolderAddr);
       const vaultBalance = await vault.balance();
       const depositAmount = userBalance;
@@ -163,7 +163,7 @@ describe('Vaults', function () {
       expect(depositAmount).to.be.closeTo(newVaultBalance, allowedInaccuracy);
     });
 
-    xit('should allow withdrawals', async function () {
+    it('should allow withdrawals', async function () {
       const userBalance = await want.balanceOf(wantHolderAddr);
       const depositAmount = userBalance;
       await vault.connect(wantHolder).deposit(depositAmount);
@@ -226,7 +226,7 @@ describe('Vaults', function () {
       await strategy.harvest();
     });
 
-    xit('should provide yield', async function () {
+    it('should provide yield', async function () {
       const timeToSkip = 3600;
       const initialUserBalance = await want.balanceOf(wantHolderAddr);
       const depositAmount = initialUserBalance;
