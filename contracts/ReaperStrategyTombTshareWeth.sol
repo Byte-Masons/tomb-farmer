@@ -16,21 +16,22 @@ contract ReaperStrategyTombTshareWeth is ReaperBaseStrategyv2 {
 
     // 3rd-party contract addresses
     address public constant TOMB_ROUTER = address(0x6D0176C5ea1e44b08D3dd001b0784cE42F47a3A7);
-    address public constant SPOOKY_ROUTER = address(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
     address public constant TSHARE_REWARDS_POOL = address(0xcc0a87F7e7c693042a9Cc703661F5060c80ACb43);
 
     /**
      * @dev Tokens Used:
      * {WFTM} - Required for liquidity routing when doing swaps.
      * {TSHARE} - Reward token for depositing LP into TShareRewardsPool.
-     * {WBTC} - One of the tokens within the LP.
+     * {WETH} - One of the tokens within the LP.
+     * {USDC} - Token to charge fees in
      * {want} - LP token address.
      * {lpToken0} - First token within the LP.
      * {lpToken1} - Second token within the LP.
      */
     address public constant WFTM = address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
     address public constant TSHARE = address(0x4cdF39285D7Ca8eB3f090fDA0C069ba5F4145B37);
-    address public constant WBTC = address(0x321162Cd933E2Be498Cd2267a90534A804051b11);
+    address public constant WETH = address(0x74b23882a30290451A17c44f4F05243b6b58C76d);
+    address public constant USDC = address(0x04068DA6C83AFCFA0e13ba15A6696662335D5B75);
     address public want;
     address public lpToken0;
     address public lpToken1;
@@ -38,16 +39,24 @@ contract ReaperStrategyTombTshareWeth is ReaperBaseStrategyv2 {
     /**
      * @dev Paths used to swap tokens:
      * {tshareToWftmPath} - to swap {TSHARE} to {WFTM} for fees.
-     * {tshareToWbtcPath} - to swap half of {TSHARE} to Wbtc.
+     * {tshareToUsdcPath} - to swap {TSHARE} to {USDC} for fees.
+     * {tshareToWethPath} - to swap half of {TSHARE} to Wbtc.
      */
     address[] public tshareToWftmPath;
-    address[] public tshareToWbtcPath;
+    address[] public tshareToUsdcPath;
+    address[] public tshareToWethPath;
 
     /**
      * @dev Tomb variables
      * {poolId} - ID of pool in which to deposit LP tokens
      */
     uint256 public poolId;
+
+    /**
+     * @dev Strategy variables
+     * {chargeFeesInUsdc} - If fees should be charged in USDC (or WFTM)
+     */
+    bool public chargeFeesInUsdc;
 
     /**
      * @dev Initializes the strategy. Sets parameters and saves routes.
@@ -67,8 +76,10 @@ contract ReaperStrategyTombTshareWeth is ReaperBaseStrategyv2 {
         lpToken0 = IUniswapV2Pair(_want).token0();
         lpToken1 = IUniswapV2Pair(_want).token1();
 
-        tshareToWftmPath = [TSHARE, WFTM];
-        tshareToWbtcPath = [TSHARE, WBTC];
+        tshareToWftmPath = [TSHARE, USDC, WFTM];
+        tshareToUsdcPath = [TSHARE, USDC];
+        tshareToWethPath = [TSHARE, WETH];
+        chargeFeesInUsdc = true;
     }
 
     /**
@@ -98,39 +109,34 @@ contract ReaperStrategyTombTshareWeth is ReaperBaseStrategyv2 {
     /**
      * @dev Core function of the strat, in charge of collecting and re-investing rewards.
      *      1. Claims {TSHARE} from the {TSHARE_REWARDS_POOL}.
-     *      2. Swaps {TSHARE} to {WFTM}.
-     *      3. Claims fees for the harvest caller and treasury.
-     *      4. Swaps half of {WFTM} to other LP token.
-     *      5. Creates new LP tokens and deposits.
+     *      2. Claims fees for the harvest caller and treasury.
+     *      3. Creates new LP tokens and deposits.
+     *      4. Deposits new LPs in the reward pool
      */
     function _harvestCore() internal override {
-        IMasterChef(TSHARE_REWARDS_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
-
-        uint256 tshareFee = (IERC20Upgradeable(TSHARE).balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR;
-        _swap(tshareFee, tshareToWftmPath, true);
+        _claimRewards();
         _chargeFees();
-        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)) / 2, tshareToWbtcPath, false);
         _addLiquidity();
         deposit();
     }
 
+    function _claimRewards() internal {
+        IMasterChef(TSHARE_REWARDS_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
+    }
+
     /**
-     * @dev Helper function to swap tokens given an {_amount} and swap {_path}. It uses either
-     *      {TOMB_ROUTER} or {SPOOKY_ROUTER} depending on the {useSpooky} parameter.
+     * @dev Helper function to swap tokens given an {_amount} and swap {_path} using {TOMB_ROUTER}
      */
     function _swap(
         uint256 _amount,
-        address[] memory _path,
-        bool useSpooky
+        address[] memory _path
     ) internal {
         if (_path.length < 2 || _amount == 0) {
             return;
         }
 
-        address router = useSpooky ? SPOOKY_ROUTER : TOMB_ROUTER;
-
-        IERC20Upgradeable(_path[0]).safeIncreaseAllowance(router, _amount);
-        IUniswapV2Router02(router).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        IERC20Upgradeable(_path[0]).safeIncreaseAllowance(TOMB_ROUTER, _amount);
+        IUniswapV2Router02(TOMB_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
             _amount,
             0,
             _path,
@@ -141,20 +147,28 @@ contract ReaperStrategyTombTshareWeth is ReaperBaseStrategyv2 {
 
     /**
      * @dev Core harvest function.
-     *      Charges fees based on the amount of WFTM gained from reward
+     *      Charges fees in USDC or WFTM
      */
     function _chargeFees() internal {
-        IERC20Upgradeable wftm = IERC20Upgradeable(WFTM);
-        uint256 wftmFee = wftm.balanceOf(address(this));
-        if (wftmFee != 0) {
-            uint256 callFeeToUser = (wftmFee * callFee) / PERCENT_DIVISOR;
-            uint256 treasuryFeeToVault = (wftmFee * treasuryFee) / PERCENT_DIVISOR;
+        uint256 tshareFee = (IERC20Upgradeable(TSHARE).balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR;
+        IERC20Upgradeable feeToken;
+        if (chargeFeesInUsdc) {
+            feeToken = IERC20Upgradeable(USDC);
+             _swap(tshareFee, tshareToUsdcPath);
+        } else {
+            feeToken = IERC20Upgradeable(WFTM);
+            _swap(tshareFee, tshareToWftmPath);
+        }
+        uint256 fee = feeToken.balanceOf(address(this));
+        if (fee != 0) {
+            uint256 callFeeToUser = (fee * callFee) / PERCENT_DIVISOR;
+            uint256 treasuryFeeToVault = (fee * treasuryFee) / PERCENT_DIVISOR;
             uint256 feeToStrategist = (treasuryFeeToVault * strategistFee) / PERCENT_DIVISOR;
             treasuryFeeToVault -= feeToStrategist;
 
-            wftm.safeTransfer(msg.sender, callFeeToUser);
-            wftm.safeTransfer(treasury, treasuryFeeToVault);
-            wftm.safeTransfer(strategistRemitter, feeToStrategist);
+            feeToken.safeTransfer(msg.sender, callFeeToUser);
+            feeToken.safeTransfer(treasury, treasuryFeeToVault);
+            feeToken.safeTransfer(strategistRemitter, feeToStrategist);
         }
     }
 
@@ -162,6 +176,7 @@ contract ReaperStrategyTombTshareWeth is ReaperBaseStrategyv2 {
      * @dev Core harvest function. Adds more liquidity using {lpToken0} and {lpToken1}.
      */
     function _addLiquidity() internal {
+        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)) / 2, tshareToWethPath);
         uint256 lp0Bal = IERC20Upgradeable(lpToken0).balanceOf(address(this));
         uint256 lp1Bal = IERC20Upgradeable(lpToken1).balanceOf(address(this));
 
@@ -199,14 +214,14 @@ contract ReaperStrategyTombTshareWeth is ReaperBaseStrategyv2 {
         uint256 totalRewards = pendingReward + IERC20Upgradeable(TSHARE).balanceOf(address(this));
 
         if (totalRewards != 0) {
-            profit += IUniswapV2Router02(SPOOKY_ROUTER).getAmountsOut(totalRewards, tshareToWftmPath)[1];
+            profit += IUniswapV2Router02(TOMB_ROUTER).getAmountsOut(totalRewards, tshareToWftmPath)[1];
         }
 
         profit += IERC20Upgradeable(WFTM).balanceOf(address(this));
 
-        uint256 wftmFee = (profit * totalFee) / PERCENT_DIVISOR;
-        callFeeToUser = (wftmFee * callFee) / PERCENT_DIVISOR;
-        profit -= wftmFee;
+        uint256 fee = (profit * totalFee) / PERCENT_DIVISOR;
+        callFeeToUser = (fee * callFee) / PERCENT_DIVISOR;
+        profit -= fee;
     }
 
     /**
