@@ -333,5 +333,73 @@ describe('Vaults', function () {
       expect(hasProfit).to.equal(true);
       expect(hasCallFee).to.equal(true);
     });
+    describe.only('Log Smoothing', function () {
+      it('should smooth harvest logs', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        const initialVaultBalance = await vault.balance();
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        const numHarvests = 4;
+        for (let i = 0; i < numHarvests - 1; i++) {
+          await moveTimeForward(timeToSkip);
+          await strategy.harvest();
+        }
+        await want.connect(wantHolder).transfer(strategy.address, ethers.utils.parseEther('1'));
+        await moveTimeForward(timeToSkip); // Unexpected large harvest
+        await strategy.harvest();
+        const finalVaultBalance = await vault.balance();
+        expect(finalVaultBalance).to.be.gt(initialVaultBalance);
+        const legacyAverageAPR = await strategy.averageAPRAcrossLastNHarvests(numHarvests);
+        console.log(`Legacy average APR across ${numHarvests} harvests is ${legacyAverageAPR} basis points.`);
+        const averageAPR = await strategy.trimmedAverageAPRAcrossLastNHarvests(numHarvests);
+        console.log(`Trimmed average APR across ${numHarvests} harvests is ${averageAPR} basis points.`);
+      });
+      it('should handle large N values', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        const initialVaultBalance = await vault.balance();
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        const numHarvests = 4;
+        for (let i = 0; i < numHarvests; i++) {
+          await moveTimeForward(timeToSkip + i);
+          await strategy.harvest();
+        }
+        const finalVaultBalance = await vault.balance();
+        expect(finalVaultBalance).to.be.gt(initialVaultBalance);
+        const averageAPR = await strategy.trimmedAverageAPRAcrossLastNHarvests(numHarvests);
+        const averageAPRoverN = await strategy.trimmedAverageAPRAcrossLastNHarvests(numHarvests + 2);
+        expect(averageAPR).to.be.equal(averageAPRoverN);
+      });
+      it('should return simple average if number of entries is small', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        const numHarvests = 4;
+        for (let i = 0; i < numHarvests - 1; i++) {
+          await moveTimeForward(timeToSkip);
+          await strategy.harvest();
+        }
+        await want.connect(wantHolder).transfer(strategy.address, ethers.utils.parseEther('1'));
+        await moveTimeForward(timeToSkip); // Unexpected large harvest
+        await strategy.harvest();
+        const legacyAverageAPR = await strategy.averageAPRAcrossLastNHarvests(2);
+        const averageAPR = await strategy.trimmedAverageAPRAcrossLastNHarvests(2);
+        expect(averageAPR).to.be.equal(legacyAverageAPR);
+      });
+      it('should revert if not enough log entries', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        await expect(strategy.trimmedAverageAPRAcrossLastNHarvests(1)).to.be.revertedWith('need at least 2 log entries');
+      });
+    });
   });
 });

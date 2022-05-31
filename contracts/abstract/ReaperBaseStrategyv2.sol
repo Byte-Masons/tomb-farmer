@@ -152,9 +152,11 @@ abstract contract ReaperBaseStrategyv2 is
     function harvest() external override whenNotPaused {
         _harvestCore();
 
-        if (block.timestamp >= harvestLog[harvestLog.length - 1].timestamp + harvestLogCadence) {
+        uint256 vaultSharePrice = IVault(vault).getPricePerFullShare();
+        if (block.timestamp >= harvestLog[harvestLog.length - 1].timestamp + harvestLogCadence 
+            && harvestLog[harvestLog.length - 1].vaultSharePrice != vaultSharePrice) {
             harvestLog.push(
-                Harvest({timestamp: block.timestamp, vaultSharePrice: IVault(vault).getPricePerFullShare()})
+                Harvest({timestamp: block.timestamp, vaultSharePrice: vaultSharePrice})
             );
         }
 
@@ -171,7 +173,7 @@ abstract contract ReaperBaseStrategyv2 is
      *      and returns the average APR calculated across all the included
      *      log entries. APR is multiplied by PERCENT_DIVISOR to retain precision.
      */
-    function averageAPRAcrossLastNHarvests(int256 _n) external view returns (int256) {
+    function averageAPRAcrossLastNHarvests(int256 _n) public view returns (int256) {
         require(harvestLog.length >= 2, "need at least 2 log entries");
 
         int256 runningAPRSum;
@@ -183,6 +185,43 @@ abstract contract ReaperBaseStrategyv2 is
         }
 
         return runningAPRSum / numLogsProcessed;
+    }
+
+    /**
+     * @dev Traverses the harvest log backwards _n items,
+     *      and returns the trimmed average APR calculated across the included log entries.
+     *      Highest and lowest values are trimmed. APR is multiplied by PERCENT_DIVISOR 
+     *      to retain precision.
+     */
+    function trimmedAverageAPRAcrossLastNHarvests(uint256 _n) external view returns (int256) {
+        if (harvestLog.length <= 4 || _n < 4){
+            return averageAPRAcrossLastNHarvests(int256(_n));
+        }
+
+        int256[] memory averageValues = new int256[](_n);
+        int256 runningAPRSum;
+        uint256 numLogsProcessed;
+        int256 trimmedLogsProcessed;
+        uint256 lowIndex = 0;
+        uint256 highIndex = 0;
+
+        for (uint256 i = harvestLog.length - 1; i > 0 && numLogsProcessed < _n; i--) {
+            averageValues[numLogsProcessed] = calculateAPRUsingLogs(i - 1, i);
+            lowIndex = averageValues[numLogsProcessed] < averageValues[lowIndex] 
+                ? numLogsProcessed : lowIndex;
+            highIndex = averageValues[numLogsProcessed] > averageValues[highIndex] 
+                ? numLogsProcessed : highIndex;
+            numLogsProcessed++;
+        }
+
+        for (uint256 i = numLogsProcessed - 1; i > 0; i--) {
+            if ( i != lowIndex && i != highIndex ) {
+                runningAPRSum += averageValues[i];
+                trimmedLogsProcessed++;
+            }
+        }
+
+        return runningAPRSum / trimmedLogsProcessed;
     }
 
     /**
