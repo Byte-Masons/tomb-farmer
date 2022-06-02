@@ -388,8 +388,11 @@ describe('Vaults', function () {
         await want.connect(wantHolder).transfer(strategy.address, ethers.utils.parseEther('1'));
         await moveTimeForward(timeToSkip); // Unexpected large harvest
         await strategy.harvest();
-        const legacyAverageAPR = await strategy.averageAPRAcrossLastNHarvests(2);
-        const averageAPR = await strategy.trimmedAverageAPRAcrossLastNHarvests(2);
+        let legacyAverageAPR = await strategy.averageAPRAcrossLastNHarvests(2);
+        let averageAPR = await strategy.trimmedAverageAPRAcrossLastNHarvests(2);
+        expect(averageAPR).to.be.equal(legacyAverageAPR);
+        legacyAverageAPR = await strategy.averageAPRAcrossLastNHarvests(1);
+        averageAPR = await strategy.trimmedAverageAPRAcrossLastNHarvests(1);
         expect(averageAPR).to.be.equal(legacyAverageAPR);
       });
       it('should revert if not enough log entries', async function () {
@@ -398,7 +401,7 @@ describe('Vaults', function () {
         const depositAmount = initialUserBalance.div(10);
         await vault.connect(wantHolder).deposit(depositAmount);
         await strategy.updateHarvestLogCadence(timeToSkip / 2);
-        await expect(strategy.trimmedAverageAPRAcrossLastNHarvests(1)).to.be.revertedWith('need at least 2 log entries');
+        await expect(strategy.trimmedAverageAPRAcrossLastNHarvests(2)).to.be.revertedWith('need at least 2 log entries');
       });
     });
   });

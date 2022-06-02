@@ -190,38 +190,37 @@ abstract contract ReaperBaseStrategyv2 is
     /**
      * @dev Traverses the harvest log backwards _n items,
      *      and returns the trimmed average APR calculated across the included log entries.
-     *      Highest and lowest values are trimmed. APR is multiplied by PERCENT_DIVISOR 
+     *      Highest and lowest values are trimmed. If unable to trim due to insufficient 
+     *      log entries, falls back to simple average. APR is multiplied by PERCENT_DIVISOR 
      *      to retain precision.
      */
     function trimmedAverageAPRAcrossLastNHarvests(uint256 _n) external view returns (int256) {
-        if (harvestLog.length <= 4 || _n < 4){
-            return averageAPRAcrossLastNHarvests(int256(_n));
+        require(harvestLog.length >= 2, "need at least 2 log entries");
+
+        if (_n >= harvestLog.length) {
+            _n = harvestLog.length - 1;
         }
 
-        int256[] memory averageValues = new int256[](_n);
+        int256[] memory positionalAPRs = new int256[](_n);
         int256 runningAPRSum;
         uint256 numLogsProcessed;
-        int256 trimmedLogsProcessed;
-        uint256 lowIndex = 0;
-        uint256 highIndex = 0;
+        uint256 lowestAPRIndex = _n - 1;
+        uint256 highestAPRIndex = lowestAPRIndex;
 
         for (uint256 i = harvestLog.length - 1; i > 0 && numLogsProcessed < _n; i--) {
-            averageValues[numLogsProcessed] = calculateAPRUsingLogs(i - 1, i);
-            lowIndex = averageValues[numLogsProcessed] < averageValues[lowIndex] 
-                ? numLogsProcessed : lowIndex;
-            highIndex = averageValues[numLogsProcessed] > averageValues[highIndex] 
-                ? numLogsProcessed : highIndex;
-            numLogsProcessed++;
+            int256 currentAPR = calculateAPRUsingLogs(i - 1, i);
+            lowestAPRIndex = currentAPR < positionalAPRs[lowestAPRIndex] ? numLogsProcessed : lowestAPRIndex;
+            highestAPRIndex = currentAPR > positionalAPRs[highestAPRIndex] ? numLogsProcessed : highestAPRIndex;
+            positionalAPRs[numLogsProcessed++] = currentAPR;
+            runningAPRSum += currentAPR;
         }
 
-        for (uint256 i = numLogsProcessed - 1; i > 0; i--) {
-            if ( i != lowIndex && i != highIndex ) {
-                runningAPRSum += averageValues[i];
-                trimmedLogsProcessed++;
-            }
+        if (_n >= 4 && lowestAPRIndex != highestAPRIndex) {
+            runningAPRSum -= positionalAPRs[lowestAPRIndex] + positionalAPRs[highestAPRIndex];
+            numLogsProcessed -= 2;
         }
 
-        return runningAPRSum / trimmedLogsProcessed;
+        return runningAPRSum / int256(numLogsProcessed);
     }
 
     /**
