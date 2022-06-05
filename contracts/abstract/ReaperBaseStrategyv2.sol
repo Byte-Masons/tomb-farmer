@@ -170,31 +170,12 @@ abstract contract ReaperBaseStrategyv2 is
 
     /**
      * @dev Traverses the harvest log backwards _n items,
-     *      and returns the average APR calculated across all the included
-     *      log entries. APR is multiplied by PERCENT_DIVISOR to retain precision.
-     */
-    function averageAPRAcrossLastNHarvests(int256 _n) public view returns (int256) {
-        require(harvestLog.length >= 2, "need at least 2 log entries");
-
-        int256 runningAPRSum;
-        int256 numLogsProcessed;
-
-        for (uint256 i = harvestLog.length - 1; i > 0 && numLogsProcessed < _n; i--) {
-            runningAPRSum += calculateAPRUsingLogs(i - 1, i);
-            numLogsProcessed++;
-        }
-
-        return runningAPRSum / numLogsProcessed;
-    }
-
-    /**
-     * @dev Traverses the harvest log backwards _n items,
      *      and returns the trimmed average APR calculated across the included log entries.
      *      Highest and lowest values are trimmed. If unable to trim due to insufficient 
      *      log entries, falls back to simple average. APR is multiplied by PERCENT_DIVISOR 
      *      to retain precision.
      */
-    function trimmedAverageAPRAcrossLastNHarvests(uint256 _n) external view returns (int256) {
+    function averageAPRAcrossLastNHarvests(uint256 _n) external view returns (int256) {
         require(harvestLog.length >= 2, "need at least 2 log entries");
 
         if (_n >= harvestLog.length) {
