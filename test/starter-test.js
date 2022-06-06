@@ -275,8 +275,16 @@ describe('Vaults', function () {
       const finalVaultBalance = await vault.balance();
       expect(finalVaultBalance).to.be.gt(initialVaultBalance);
 
-      const averageAPR = await strategy.averageAPRAcrossLastNHarvests(numHarvests);
+      const simpleAPRs = [];
+      for (let i = 1; i <= numHarvests; i++) {
+        const simpleAPR = await strategy.calculateAPRUsingLogs(i - 1, i);
+        simpleAPRs.push(simpleAPR.toNumber());
+      }
+      const simpleAverageAPR = simpleAPRs.reduce((a, b) => a + b, 0) / simpleAPRs.length;
+
+      const averageAPR = await strategy.averageAPRAcrossLastNHarvests(numHarvests).then((result) => result.toNumber());
       console.log(`Average APR across ${numHarvests} harvests is ${averageAPR} basis points.`);
+      expect(simpleAverageAPR).to.be.closeTo(averageAPR, averageAPR * 0.05);
     });
   });
   describe('Strategy', function () {
@@ -332,6 +340,36 @@ describe('Vaults', function () {
       const hasCallFee = callFeeToUser.gt(0);
       expect(hasProfit).to.equal(true);
       expect(hasCallFee).to.equal(true);
+    });
+
+    describe.skip('BaseStrategy', function () {
+      it('averageAPR should revert if not enough log entries', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        await expect(strategy.averageAPRAcrossLastNHarvests(2)).to.be.revertedWith('need at least 2 log entries');
+      });
+
+      it('averageAPR should handle N values larger than number of logs', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        const initialVaultBalance = await vault.balance();
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        const numHarvests = 4;
+        for (let i = 0; i < numHarvests; i++) {
+          await moveTimeForward(timeToSkip + i);
+          await strategy.harvest();
+        }
+        const finalVaultBalance = await vault.balance();
+        expect(finalVaultBalance).to.be.gt(initialVaultBalance);
+        const averageAPR = await strategy.averageAPRAcrossLastNHarvests(numHarvests);
+        const averageAPRoverN = await strategy.averageAPRAcrossLastNHarvests(numHarvests + 2);
+        expect(averageAPR).to.be.equal(averageAPRoverN);
+      });
     });
   });
 });

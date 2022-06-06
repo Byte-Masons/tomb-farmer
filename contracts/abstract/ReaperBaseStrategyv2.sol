@@ -152,9 +152,11 @@ abstract contract ReaperBaseStrategyv2 is
     function harvest() external override whenNotPaused {
         _harvestCore();
 
-        if (block.timestamp >= harvestLog[harvestLog.length - 1].timestamp + harvestLogCadence) {
+        uint256 vaultSharePrice = IVault(vault).getPricePerFullShare();
+        if (block.timestamp >= harvestLog[harvestLog.length - 1].timestamp + harvestLogCadence 
+            && harvestLog[harvestLog.length - 1].vaultSharePrice != vaultSharePrice) {
             harvestLog.push(
-                Harvest({timestamp: block.timestamp, vaultSharePrice: IVault(vault).getPricePerFullShare()})
+                Harvest({timestamp: block.timestamp, vaultSharePrice: vaultSharePrice})
             );
         }
 
@@ -168,21 +170,38 @@ abstract contract ReaperBaseStrategyv2 is
 
     /**
      * @dev Traverses the harvest log backwards _n items,
-     *      and returns the average APR calculated across all the included
-     *      log entries. APR is multiplied by PERCENT_DIVISOR to retain precision.
+     *      and returns the trimmed average APR calculated across the included log entries.
+     *      Highest and lowest values are trimmed. If unable to trim due to insufficient 
+     *      log entries, falls back to simple average. APR is multiplied by PERCENT_DIVISOR 
+     *      to retain precision.
      */
-    function averageAPRAcrossLastNHarvests(int256 _n) external view returns (int256) {
+    function averageAPRAcrossLastNHarvests(uint256 _n) external view returns (int256) {
         require(harvestLog.length >= 2, "need at least 2 log entries");
 
-        int256 runningAPRSum;
-        int256 numLogsProcessed;
-
-        for (uint256 i = harvestLog.length - 1; i > 0 && numLogsProcessed < _n; i--) {
-            runningAPRSum += calculateAPRUsingLogs(i - 1, i);
-            numLogsProcessed++;
+        if (_n >= harvestLog.length) {
+            _n = harvestLog.length - 1;
         }
 
-        return runningAPRSum / numLogsProcessed;
+        int256[] memory positionalAPRs = new int256[](_n);
+        int256 runningAPRSum;
+        uint256 numLogsProcessed;
+        uint256 lowestAPRIndex = 0;
+        uint256 highestAPRIndex = 0;
+
+        for (uint256 i = harvestLog.length - 1; i > 0 && numLogsProcessed < _n; i--) {
+            int256 currentAPR = calculateAPRUsingLogs(i - 1, i);
+            lowestAPRIndex = currentAPR < positionalAPRs[lowestAPRIndex] ? numLogsProcessed : lowestAPRIndex;
+            highestAPRIndex = currentAPR > positionalAPRs[highestAPRIndex] ? numLogsProcessed : highestAPRIndex;
+            positionalAPRs[numLogsProcessed++] = currentAPR;
+            runningAPRSum += currentAPR;
+        }
+
+        if (_n >= 4 && lowestAPRIndex != highestAPRIndex) {
+            runningAPRSum -= positionalAPRs[lowestAPRIndex] + positionalAPRs[highestAPRIndex];
+            numLogsProcessed -= 2;
+        }
+
+        return runningAPRSum / int256(numLogsProcessed);
     }
 
     /**
