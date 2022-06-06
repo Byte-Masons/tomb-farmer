@@ -9,6 +9,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
+import "hardhat/console.sol"; //TODO: Remove
+
 abstract contract ReaperBaseStrategyv2 is
     IStrategy,
     UUPSUpgradeable,
@@ -150,7 +152,7 @@ abstract contract ReaperBaseStrategyv2 is
      *      override _harvestCore() and implement their specific logic in it.
      */
     function harvest() external override whenNotPaused {
-        _harvestCore();
+        // _harvestCore();
 
         uint256 vaultSharePrice = IVault(vault).getPricePerFullShare();
         if (block.timestamp >= harvestLog[harvestLog.length - 1].timestamp + harvestLogCadence 
@@ -185,13 +187,16 @@ abstract contract ReaperBaseStrategyv2 is
         int256[] memory positionalAPRs = new int256[](_n);
         int256 runningAPRSum;
         uint256 numLogsProcessed;
-        uint256 lowestAPRIndex = _n - 1;
-        uint256 highestAPRIndex = lowestAPRIndex;
+        uint256 lowestAPRIndex = 0;
+        uint256 highestAPRIndex = 0;
 
         for (uint256 i = harvestLog.length - 1; i > 0 && numLogsProcessed < _n; i--) {
             int256 currentAPR = calculateAPRUsingLogs(i - 1, i);
+            console.logInt(currentAPR);
             lowestAPRIndex = currentAPR < positionalAPRs[lowestAPRIndex] ? numLogsProcessed : lowestAPRIndex;
             highestAPRIndex = currentAPR > positionalAPRs[highestAPRIndex] ? numLogsProcessed : highestAPRIndex;
+            console.logUint(lowestAPRIndex);            
+            console.logUint(highestAPRIndex);
             positionalAPRs[numLogsProcessed++] = currentAPR;
             runningAPRSum += currentAPR;
         }

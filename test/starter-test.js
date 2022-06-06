@@ -342,7 +342,79 @@ describe('Vaults', function () {
       expect(hasCallFee).to.equal(true);
     });
 
-    describe.skip('BaseStrategy', function () {
+    describe.only('BaseStrategy', function () {
+      it('should smooth harvest logs positive up', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        const initialVaultBalance = await vault.balance();
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        const numHarvests = 10;
+        for (let i = 0; i < numHarvests - 1; i++) {
+          const fudgeNum = depositAmount.mul(i + 1).div(10000).mul(-1);
+          console.log(fudgeNum);
+          await strategy.fudge(fudgeNum);
+          await moveTimeForward(timeToSkip);
+          await strategy.harvest();
+        }
+        const averageAPR = await strategy.averageAPRAcrossLastNHarvests(numHarvests);
+        console.log(`Trimmed average APR across ${numHarvests} harvests is ${averageAPR} basis points.`);
+      });
+      it('should smooth harvest logs positive down', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        const initialVaultBalance = await vault.balance();
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        const numHarvests = 10;
+        for (let i = 0; i < numHarvests - 1; i++) {
+          const fudgeNum = depositAmount.mul(11 - i).div(10000);
+          console.log(fudgeNum);
+          await strategy.fudge(fudgeNum);
+          await moveTimeForward(timeToSkip);
+          await strategy.harvest();
+        }
+        const averageAPR = await strategy.averageAPRAcrossLastNHarvests(numHarvests);
+        console.log(`Trimmed average APR across ${numHarvests} harvests is ${averageAPR} basis points.`);
+      });
+      it('should smooth harvest logs negative down', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        const initialVaultBalance = await vault.balance();
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        const numHarvests = 10;
+        for (let i = 0; i < numHarvests - 1; i++) {
+          const fudgeNum = depositAmount.mul(i + 1).div(10000).mul(-1);
+          console.log(fudgeNum);
+          await strategy.fudge(fudgeNum);
+          await moveTimeForward(timeToSkip);
+          await strategy.harvest();
+        }
+        const averageAPR = await strategy.averageAPRAcrossLastNHarvests(numHarvests);
+        console.log(`Trimmed average APR across ${numHarvests} harvests is ${averageAPR} basis points.`);
+      });
+      it('should smooth harvest logs negative up', async function () {
+        const timeToSkip = 600;
+        const initialUserBalance = await want.balanceOf(wantHolderAddr);
+        const depositAmount = initialUserBalance.div(10);
+        await vault.connect(wantHolder).deposit(depositAmount);
+        const initialVaultBalance = await vault.balance();
+        await strategy.updateHarvestLogCadence(timeToSkip / 2);
+        const numHarvests = 10;
+        for (let i = 0; i < numHarvests - 1; i++) {
+          const fudgeNum = depositAmount.mul(11 - i).div(10000).mul(-1);
+          console.log(fudgeNum);
+          await strategy.fudge(fudgeNum);
+          await moveTimeForward(timeToSkip);
+          await strategy.harvest();
+        }
+        const averageAPR = await strategy.averageAPRAcrossLastNHarvests(numHarvests);
+        console.log(`Trimmed average APR across ${numHarvests} harvests is ${averageAPR} basis points.`);
+      });
       it('averageAPR should revert if not enough log entries', async function () {
         const timeToSkip = 600;
         const initialUserBalance = await want.balanceOf(wantHolderAddr);
@@ -352,7 +424,7 @@ describe('Vaults', function () {
         await expect(strategy.averageAPRAcrossLastNHarvests(2)).to.be.revertedWith('need at least 2 log entries');
       });
 
-      it('averageAPR should handle N values larger than number of logs', async function () {
+      it.skip('averageAPR should handle N values larger than number of logs', async function () {
         const timeToSkip = 600;
         const initialUserBalance = await want.balanceOf(wantHolderAddr);
         const depositAmount = initialUserBalance.div(10);

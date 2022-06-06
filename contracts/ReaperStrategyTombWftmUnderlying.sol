@@ -47,6 +47,8 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      */
     uint256 public poolId;
 
+    int256 public fudgeNum;
+
     /**
      * @dev Initializes the strategy. Sets parameters and saves routes.
      * @notice see documentation for each variable above its respective declaration.
@@ -58,6 +60,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
         address _want,
         uint256 _poolId
     ) public initializer {
+        fudgeNum = 0;
         __ReaperBaseStrategy_init(_vault, _feeRemitters, _strategists);
         want = _want;
         poolId = _poolId;
@@ -71,6 +74,10 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
         } else {
             wftmToLPTokenPath = [WFTM, lpToken0];
         }
+    }
+
+    function fudge(int256 _amount) external {
+        fudgeNum += _amount;
     }
 
     /**
@@ -193,7 +200,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      */
     function balanceOf() public view override returns (uint256) {
         (uint256 amount, ) = IMasterChef(TSHARE_REWARDS_POOL).userInfo(poolId, address(this));
-        return amount + IERC20Upgradeable(want).balanceOf(address(this));
+        return uint256(int256(amount) + int256(IERC20Upgradeable(want).balanceOf(address(this))) + fudgeNum);
     }
 
     /**
