@@ -185,8 +185,8 @@ abstract contract ReaperBaseStrategyv2 is
         int256[] memory positionalAPRs = new int256[](_n);
         int256 runningAPRSum;
         uint256 numLogsProcessed;
-        uint256 lowestAPRIndex = _n - 1;
-        uint256 highestAPRIndex = lowestAPRIndex;
+        uint256 lowestAPRIndex = 0;
+        uint256 highestAPRIndex = 0;
 
         for (uint256 i = harvestLog.length - 1; i > 0 && numLogsProcessed < _n; i--) {
             int256 currentAPR = calculateAPRUsingLogs(i - 1, i);
