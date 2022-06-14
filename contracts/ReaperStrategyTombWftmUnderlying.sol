@@ -9,7 +9,7 @@ import "./interfaces/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 /**
- * @dev Deposit TombSwap LPs (with WFTM underlying) in TShareRewardsPool. Harvest TSHARE rewards and recompound.
+ * @dev Deposit TombSwap LPs (with WFTM underlying) in LShareRewardPool. Harvest LSHARE rewards and compound.
  */
 contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -17,28 +17,30 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
     // 3rd-party contract addresses
     address public constant TOMB_ROUTER = address(0x6D0176C5ea1e44b08D3dd001b0784cE42F47a3A7);
     address public constant SPOOKY_ROUTER = address(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
-    address public constant TSHARE_REWARDS_POOL = address(0xcc0a87F7e7c693042a9Cc703661F5060c80ACb43);
+    address public constant LSHARE_REWARD_POOL = address(0x1F832dfBA15346D25438Cf7Ac683b013Ed03E32f);
 
     /**
      * @dev Tokens Used:
      * {WFTM} - Required for liquidity routing when doing swaps.
-     * {TSHARE} - Reward token for depositing LP into TShareRewardsPool.
+     * {LSHARE} - Reward token for depositing LP into LShareRewardPool.
+     * {USDC} - Used to route LSHARE to WFTM.
      * {want} - LP token address.
      * {lpToken0} - First token within the LP.
      * {lpToken1} - Second token within the LP.
      */
     address public constant WFTM = address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
-    address public constant TSHARE = address(0x4cdF39285D7Ca8eB3f090fDA0C069ba5F4145B37);
+    address public constant LSHARE = address(0xCbE0CA46399Af916784cADF5bCC3aED2052D6C45);
+    address public constant USDC = address(0x04068DA6C83AFCFA0e13ba15A6696662335D5B75);
     address public want;
     address public lpToken0;
     address public lpToken1;
 
     /**
      * @dev Paths used to swap tokens:
-     * {tshareToWftmPath} - to swap {TSHARE} to {WFTM}
+     * {lshareToWftmPath} - to swap {LSHARE} to {WFTM}
      * {wftmToLPTokenPath} - to swap half of {WFTM} to the other underlying token within the LP.
      */
-    address[] public tshareToWftmPath;
+    address[] public lshareToWftmPath;
     address[] public wftmToLPTokenPath;
 
     /**
@@ -65,7 +67,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
         lpToken0 = IUniswapV2Pair(_want).token0();
         lpToken1 = IUniswapV2Pair(_want).token1();
 
-        tshareToWftmPath = [TSHARE, WFTM];
+        lshareToWftmPath = [LSHARE,USDC, WFTM];
         if (lpToken0 == WFTM) {
             wftmToLPTokenPath = [WFTM, lpToken1];
         } else {
@@ -80,8 +82,8 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
     function _deposit() internal override {
         uint256 wantBalance = IERC20Upgradeable(want).balanceOf(address(this));
         if (wantBalance != 0) {
-            IERC20Upgradeable(want).safeIncreaseAllowance(TSHARE_REWARDS_POOL, wantBalance);
-            IMasterChef(TSHARE_REWARDS_POOL).deposit(poolId, wantBalance);
+            IERC20Upgradeable(want).safeIncreaseAllowance(LSHARE_REWARD_POOL, wantBalance);
+            IMasterChef(LSHARE_REWARD_POOL).deposit(poolId, wantBalance);
         }
     }
 
@@ -91,7 +93,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
     function _withdraw(uint256 _amount) internal override {
         uint256 wantBal = IERC20Upgradeable(want).balanceOf(address(this));
         if (wantBal < _amount) {
-            IMasterChef(TSHARE_REWARDS_POOL).withdraw(poolId, _amount - wantBal);
+            IMasterChef(LSHARE_REWARD_POOL).withdraw(poolId, _amount - wantBal);
         }
 
         IERC20Upgradeable(want).safeTransfer(vault, _amount);
@@ -99,15 +101,15 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
 
     /**
      * @dev Core function of the strat, in charge of collecting and re-investing rewards.
-     *      1. Claims {TSHARE} from the {TSHARE_REWARDS_POOL}.
-     *      2. Swaps {TSHARE} to {WFTM}.
+     *      1. Claims {LSHARE} from the {LSHARE_REWARD_POOL}.
+     *      2. Swaps {LSHARE} to {WFTM}.
      *      3. Claims fees for the harvest caller and treasury.
      *      4. Swaps half of {WFTM} to other LP token.
      *      5. Creates new LP tokens and deposits.
      */
     function _harvestCore() internal override {
-        IMasterChef(TSHARE_REWARDS_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
-        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)), tshareToWftmPath);
+        IMasterChef(LSHARE_REWARD_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
+        _swap(IERC20Upgradeable(LSHARE).balanceOf(address(this)), lshareToWftmPath);
         _chargeFees();
         _swap(IERC20Upgradeable(WFTM).balanceOf(address(this)) / 2, wftmToLPTokenPath);
         _addLiquidity();
@@ -192,7 +194,7 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      *      It takes into account both the funds in hand, plus the funds in the MasterChef.
      */
     function balanceOf() public view override returns (uint256) {
-        (uint256 amount, ) = IMasterChef(TSHARE_REWARDS_POOL).userInfo(poolId, address(this));
+        (uint256 amount, ) = IMasterChef(LSHARE_REWARD_POOL).userInfo(poolId, address(this));
         return amount + IERC20Upgradeable(want).balanceOf(address(this));
     }
 
@@ -201,15 +203,18 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      *      Profit is denominated in WFTM, and takes fees into account.
      */
     function estimateHarvest() external view override returns (uint256 profit, uint256 callFeeToUser) {
-        uint256 pendingReward = IMasterChef(TSHARE_REWARDS_POOL).pendingShare(poolId, address(this));
-        uint256 totalRewards = pendingReward + IERC20Upgradeable(TSHARE).balanceOf(address(this));
+        uint256 pendingReward = IMasterChef(LSHARE_REWARD_POOL).pendingShare(poolId, address(this));
+        uint256 totalRewards = pendingReward + IERC20Upgradeable(LSHARE).balanceOf(address(this));
+        uint256 fromTombRouter = 0;
+        uint256 fromSpookyRouter = 0;
 
         if (totalRewards != 0) {
-            uint256 fromTombRouter = IUniswapV2Router02(TOMB_ROUTER).getAmountsOut(totalRewards, tshareToWftmPath)[1];
-            uint256 fromSpookyRouter = IUniswapV2Router02(SPOOKY_ROUTER).getAmountsOut(totalRewards, tshareToWftmPath)[
-                1
-            ];
-            profit += fromTombRouter > fromSpookyRouter ? fromTombRouter : fromSpookyRouter;
+            try IUniswapV2Router02(TOMB_ROUTER).getAmountsOut(totalRewards, lshareToWftmPath) returns (uint256[] memory amounts) {
+                fromTombRouter = amounts[lshareToWftmPath.length - 1];
+            } catch {}
+            try IUniswapV2Router02(SPOOKY_ROUTER).getAmountsOut(totalRewards, lshareToWftmPath) returns (uint256[] memory amounts) {
+                fromSpookyRouter = amounts[lshareToWftmPath.length - 1];
+            } catch {}
         }
 
         profit += IERC20Upgradeable(WFTM).balanceOf(address(this));
@@ -227,13 +232,13 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      * Note: this is not an emergency withdraw function. For that, see panic().
      */
     function _retireStrat() internal override {
-        IMasterChef(TSHARE_REWARDS_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
-        _swap(IERC20Upgradeable(TSHARE).balanceOf(address(this)), tshareToWftmPath);
+        IMasterChef(LSHARE_REWARD_POOL).deposit(poolId, 0); // deposit 0 to claim rewards
+        _swap(IERC20Upgradeable(LSHARE).balanceOf(address(this)), lshareToWftmPath);
         _swap(IERC20Upgradeable(WFTM).balanceOf(address(this)) / 2, wftmToLPTokenPath);
         _addLiquidity();
 
-        (uint256 poolBal, ) = IMasterChef(TSHARE_REWARDS_POOL).userInfo(poolId, address(this));
-        IMasterChef(TSHARE_REWARDS_POOL).withdraw(poolId, poolBal);
+        (uint256 poolBal, ) = IMasterChef(LSHARE_REWARD_POOL).userInfo(poolId, address(this));
+        IMasterChef(LSHARE_REWARD_POOL).withdraw(poolId, poolBal);
 
         uint256 wantBalance = IERC20Upgradeable(want).balanceOf(address(this));
         IERC20Upgradeable(want).safeTransfer(vault, wantBalance);
@@ -243,6 +248,6 @@ contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
      * Withdraws all funds leaving rewards behind.
      */
     function _reclaimWant() internal override {
-        IMasterChef(TSHARE_REWARDS_POOL).emergencyWithdraw(poolId);
+        IMasterChef(LSHARE_REWARD_POOL).emergencyWithdraw(poolId);
     }
 }
