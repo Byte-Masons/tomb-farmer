@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 /**
  * @dev Deposit TombSwap LPs (with WFTM underlying) in LShareRewardPool. Harvest LSHARE rewards and compound.
  */
-contract ReaperStrategyTombWftmUnderlying is ReaperBaseStrategyv2 {
+contract ReaperStrategyTombUsdcUnderlying is ReaperBaseStrategyv2 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     // 3rd-party contract addresses
