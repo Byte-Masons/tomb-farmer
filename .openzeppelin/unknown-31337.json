@@ -13,7 +13,7 @@
     },
     {
       "address": "0x8198f5d8F8CfFE8f9C413d98a0A55aEB8ab9FbB7",
-      "txHash": "0x3189f1466469105ea74303913bd243d32438a9f481e51029a94bdf1cbf7f1d5d",
+      "txHash": "0xc0c50987ca742bee4c68376375289f667ded776397aba908093e702a606aaa39",
       "kind": "uups"
     }
   ],
@@ -1102,9 +1102,9 @@
         }
       }
     },
-    "dac2520a070bb789e918e6a574417448adb35f26691d8cb903600015a6103737": {
+    "6b63c195134833df545e469ec4a578e6e7e9150c844750baae169001e2914e10": {
       "address": "0x36b58F5C1969B7b6591D752ea6F5486D069010AB",
-      "txHash": "0x70b01f6d3b6ac4537c7ac19021fe4547282c6ea4e341bc2bf2613ec672fa6e38",
+      "txHash": "0x224aa9be76450cb34069d722ad512f381af9ab8ea5140cc5ca9e40819d7ba043",
       "layout": {
         "storage": [
           {
@@ -1182,7 +1182,7 @@
           {
             "contract": "ReaperBaseStrategyv2",
             "label": "harvestLog",
-            "type": "t_array(t_struct(Harvest)5985_storage)dyn_storage",
+            "type": "t_array(t_struct(Harvest)5994_storage)dyn_storage",
             "src": "contracts\\abstract\\ReaperBaseStrategyv2.sol:27"
           },
           {
@@ -1273,19 +1273,25 @@
             "contract": "ReaperStrategyTombWftmUnderlying",
             "label": "lshareToWftmPath",
             "type": "t_array(t_address)dyn_storage",
-            "src": "contracts\\ReaperStrategyTombWftmUnderlying.sol:43"
+            "src": "contracts\\ReaperStrategyTombWftmUnderlying.sol:44"
           },
           {
             "contract": "ReaperStrategyTombWftmUnderlying",
-            "label": "wftmToLPTokenPath",
+            "label": "lshareToUsdcPath",
             "type": "t_array(t_address)dyn_storage",
-            "src": "contracts\\ReaperStrategyTombWftmUnderlying.sol:44"
+            "src": "contracts\\ReaperStrategyTombWftmUnderlying.sol:45"
+          },
+          {
+            "contract": "ReaperStrategyTombWftmUnderlying",
+            "label": "usdcToLPTokenPath",
+            "type": "t_array(t_address)dyn_storage",
+            "src": "contracts\\ReaperStrategyTombWftmUnderlying.sol:47"
           },
           {
             "contract": "ReaperStrategyTombWftmUnderlying",
             "label": "poolId",
             "type": "t_uint256",
-            "src": "contracts\\ReaperStrategyTombWftmUnderlying.sol:50"
+            "src": "contracts\\ReaperStrategyTombWftmUnderlying.sol:53"
           }
         ],
         "types": {
@@ -1298,10 +1304,10 @@
           "t_uint256": {
             "label": "uint256"
           },
-          "t_array(t_struct(Harvest)5985_storage)dyn_storage": {
+          "t_array(t_struct(Harvest)5994_storage)dyn_storage": {
             "label": "struct ReaperBaseStrategyv2.Harvest[]"
           },
-          "t_struct(Harvest)5985_storage": {
+          "t_struct(Harvest)5994_storage": {
             "label": "struct ReaperBaseStrategyv2.Harvest",
             "members": [
               {
