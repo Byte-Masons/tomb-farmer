@@ -1,10 +1,10 @@
 async function main() {
   const Vault = await ethers.getContractFactory('ReaperVaultv1_4');
 
-  const wantAddress = '0xfca12A13ac324C09e9F43B5e5cfC9262f3Ab3223';
-  const tokenName = 'TOMB-FTM Tomb Crypt';
-  const tokenSymbol = 'rf-TOMB-FTM';
-  const depositFee = 0;
+  const wantAddress = '0xd702D7495b010936EBc53a1efeE42D97996Ca5Ee';
+  const tokenName = 'TSHARE-WETH Tomb Crypt';
+  const tokenSymbol = 'rf-TSHARE-WETH';
+  const depositFee = 25;
   const tvlCap = ethers.constants.MaxUint256;
 
   const vault = await Vault.deploy(wantAddress, tokenName, tokenSymbol, depositFee, tvlCap);
